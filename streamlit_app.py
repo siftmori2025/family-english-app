@@ -9,27 +9,25 @@ if "GOOGLE_API_KEY" in st.secrets:
 else:
     st.error("APIキーを設定してください。")
 
-# 【ここが重要】画像から判明した最新のモデル名に固定します
 model_name = "gemini-3-flash-preview"
 model = genai.GenerativeModel(model_name)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 音声入力
 audio_value = st.audio_input("ここを押して話してね")
 
 if audio_value:
     with st.spinner('Gemini 3 が考えています...'):
         try:
-            # 最新の送信形式
             audio_data = {
                 "mime_type": "audio/wav",
                 "data": audio_value.getvalue()
             }
             
+            # 【ポイント】AIに「音声で答えられるように短く返して」と指示を微調整
             response = model.generate_content([
-                "You are a friendly English teacher. Roleplay based on situations. Keep it short.",
+                "You are a friendly English teacher. Reply in short English (1-2 sentences).",
                 *st.session_state.messages,
                 audio_data
             ])
@@ -39,6 +37,11 @@ if audio_value:
             
             st.subheader("Teacher:")
             st.write(response.text)
+
+            # --- ここから音声読み上げ機能を追加 ---
+            # Googleの標準的な読み上げ機能（TTS）を呼び出します
+            st.audio(f"https://translate.google.com/translate_tts?ie=UTF-8&q={response.text.replace(' ', '%20')}&tl=en&client=tw-ob", format="audio/mp3")
+            # ------------------------------------
             
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")
