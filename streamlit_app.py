@@ -1,59 +1,37 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.title("Family English Tutor 🎤")
+st.title("Family English Tutor (Gemini 3) 🎤")
 
 # APIキー設定
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("APIキーをSecretsに設定してください。")
+    st.error("APIキーを設定してください。")
 
-# --- 404エラーを絶対に回避するためのモデルロード ---
-@st.cache_resource
-def get_working_model():
-    # 2026年現在、利用可能な可能性が高いモデル名を順番に試します
-    candidates = [
-        'models/gemini-1.5-flash',
-        'models/gemini-1.5-flash-latest',
-        'models/gemini-2.0-flash',
-        'gemini-1.5-flash'
-    ]
-    for name in candidates:
-        try:
-            m = genai.GenerativeModel(name)
-            # 接続テスト（これを通れば本物）
-            m.generate_content("Hi")
-            return m
-        except:
-            continue
-    return None
-
-model = get_working_model()
-
-if model is None:
-    st.error("GoogleのAIに接続できません。APIキーの有効化が完了していないか、名前が変更されています。")
-# ----------------------------------------------
+# 【ここが重要】画像から判明した最新のモデル名に固定します
+model_name = "gemini-3-flash-preview"
+model = genai.GenerativeModel(model_name)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# 音声入力
 audio_value = st.audio_input("ここを押して話してね")
 
 if audio_value:
-    with st.spinner('先生が考えています...'):
+    with st.spinner('Gemini 3 が考えています...'):
         try:
-            # 音声データを送信可能な形式に変換
-            audio_part = {
+            # 最新の送信形式
+            audio_data = {
                 "mime_type": "audio/wav",
                 "data": audio_value.getvalue()
             }
             
-            # 会話の実行
             response = model.generate_content([
-                "You are a friendly English teacher. Roleplay. Keep it short.",
+                "You are a friendly English teacher. Roleplay based on situations. Keep it short.",
                 *st.session_state.messages,
-                audio_part
+                audio_data
             ])
             
             st.session_state.messages.append(f"User: (Voice)")
@@ -63,7 +41,7 @@ if audio_value:
             st.write(response.text)
             
         except Exception as e:
-            st.error(f"エラー: {e}")
+            st.error(f"エラーが発生しました: {e}")
 
 st.divider()
 if st.button("アドバイスをもらう"):
