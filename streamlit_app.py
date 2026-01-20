@@ -38,14 +38,19 @@ if audio_value:
             st.subheader("Teacher:")
             st.write(response.text)
 
-            # --- 音声読み上げ機能（安定版） ---
-            # テキストをURLエンコード（空白などを特殊記号に変換）して確実に読み込ませます
-            import urllib.parse
-            encoded_text = urllib.parse.quote(response.text)
-            tts_url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded_text}&tl=en&client=tw-ob"
-            
-            # 再生ボタンを表示
-            st.audio(tts_url, format="audio/mp3")
+# --- 音声読み上げ（最新・安定版） ---
+# HTMLとJavaScriptを使って、ブラウザの音声を直接鳴らします
+import streamlit.components.v1 as components
+
+js_code = f"""
+<script>
+    var msg = new SpeechSynthesisUtterance("{response.text.replace('"', '')}");
+    msg.lang = 'en-US';
+    window.speechSynthesis.speak(msg);
+</script>
+"""
+components.html(js_code, height=0)
+# -------------------------------
             
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")
