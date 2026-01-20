@@ -11,7 +11,7 @@ else:
 
 # 【修正ポイント】モデル名を最新の指定に変更
 # もしこれでもエラーが出る場合は 'gemini-1.5-flash-latest' もお試しください
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
