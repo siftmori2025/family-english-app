@@ -2,7 +2,6 @@ import streamlit as st
 import google.generativeai as genai
 
 st.title("Family English Tutor 🎤")
-st.write("ボタンを押して英語で話してね！終わったらアドバイスボタンを押してね。")
 
 # APIキー設定
 if "GOOGLE_API_KEY" in st.secrets:
@@ -12,36 +11,35 @@ else:
 
 model = genai.GenerativeModel('gemini-1.5-flash')
 
-# 会話履歴を保存する仕組み
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 音声入力
+# 【変更点】より安定した音声入力パーツに変更
 audio_value = st.audio_input("ここを押して話してね")
+
+# もし上がダメな場合、以下の「ファイルアップロード」を予備として出す
+if audio_value is None:
+    st.info("※マイクが反応しない場合は、スマホのボイスメモ録音ファイルを下にドラッグしてもOKです。")
+    audio_value = st.file_uploader("音声ファイルをアップロード", type=['wav', 'mp3', 'm4a'])
 
 if audio_value:
     with st.spinner('先生が考えています...'):
-        # 先生への指示（会話モード）
         response = model.generate_content([
-            "あなたはフレンドリーな英会話講師です。ホテルの受付や道案内の役になりきってください。今はまだアドバイスはせず、会話を楽しんでください。1回の返信は短く。 ",
-            *st.session_state.messages, # 過去の会話を覚えさせる
+            "あなたはフレンドリーな英会話講師です。今はロールプレイ中で、アドバイスはせず会話を楽しんでください。返信は短く。",
+            *st.session_state.messages,
             audio_value
         ])
-        st.session_state.messages.append(f"User: {audio_value}") # 履歴に追加
+        st.session_state.messages.append(f"User (Audio attached)")
         st.session_state.messages.append(f"Teacher: {response.text}")
     
     st.subheader("Teacher:")
     st.write(response.text)
 
-st.divider() # 区切り線
+st.divider()
 
-# 【ここが追加ポイント】アドバイスボタン
 if st.button("今日の英会話のアドバイスをもらう"):
     if len(st.session_state.messages) > 0:
         with st.spinner('アドバイスをまとめています...'):
-            advice_query = "これまでの会話を振り返って、文法の間違いや、より自然な言い回しを日本語で優しく解説してください。"
-            advice_res = model.generate_content([advice_query, str(st.session_state.messages)])
+            advice_res = model.generate_content(["これまでの会話を日本語で優しく添削して", str(st.session_state.messages)])
             st.success("✨ 先生からのアドバイス")
             st.write(advice_res.text)
-    else:
-        st.warning("まずは会話を始めてみてね！")
