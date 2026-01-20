@@ -10,7 +10,7 @@ if "GOOGLE_API_KEY" in st.secrets:
 else:
     st.error("APIキーを設定してください。")
 
-model_name = "gemini-2.0-flash"
+model_name = "gemini-3-flash-preview"
 model = genai.GenerativeModel(model_name)
 
 # 履歴を保存する場所（テキストのみを保存するようにします）
