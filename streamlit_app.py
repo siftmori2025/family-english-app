@@ -3,70 +3,55 @@ import google.generativeai as genai
 
 st.title("Family English Tutor 🎤")
 
-# APIキー設定
+# --- 設定 ---
+# APIキーを読み込む
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("APIキーが設定されていません。Settings > Secretsを確認してください。")
+    st.error("APIキーが未設定です。Streamlit CloudのSettingsから設定してください。")
 
-# --- モデルの読み込み（エラー回避ロジック） ---
-@st.cache_resource
-def load_model():
-    # 2026年現在、最も確実に動く候補を順番に試します
-    model_names = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-3-flash']
-    for name in model_names:
-        try:
-            m = genai.GenerativeModel(name)
-            # テスト送信して確認
-            m.generate_content("test")
-            return m
-        except:
-            continue
-    return None
-
-model = load_model()
-
-if model is None:
-    st.error("利用可能なAIモデルが見つかりませんでした。APIキーが正しいか、Google AI Studioで有効か確認してください。")
-# --------------------------------------------
+# モデル名を一番確実なものに固定
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 音声入力
+# --- 音声入力 ---
 audio_value = st.audio_input("ここを押して話してね")
 
 if audio_value:
-    with st.spinner('先生が聞いています...'):
+    with st.spinner('先生が考えています...'):
         try:
-            # 音声データをAIが受け取れる辞書形式に
-            audio_data = {
+            # 音声データを準備
+            audio_content = {
                 "mime_type": "audio/wav",
                 "data": audio_value.getvalue()
             }
             
-            prompt = "You are a friendly English teacher. Roleplay based on situations like 'hotel' or 'directions'. Keep it short."
+            # AIへのメッセージ送信
+            response = model.generate_content([
+                "You are a friendly English teacher. Roleplay situations like hotels or directions. Reply in short English.",
+                *st.session_state.messages,
+                audio_content
+            ])
             
-            # 履歴を含めて送信
-            response = model.generate_content([prompt, *st.session_state.messages, audio_data])
-            
-            st.session_state.messages.append(f"User: (Voice message)")
+            # 履歴に保存
+            st.session_state.messages.append(f"User: (Voice)")
             st.session_state.messages.append(f"Teacher: {response.text}")
             
             st.subheader("Teacher:")
             st.write(response.text)
             
         except Exception as e:
-            st.error(f"会話中にエラーが発生しました: {e}")
+            st.error(f"エラーが発生しました: {e}")
 
+# --- アドバイスボタン ---
 st.divider()
-
-if st.button("今日の英会話のアドバイスをもらう"):
-    if len(st.session_state.messages) > 0:
-        with st.spinner('分析中...'):
-            advice_res = model.generate_content([
-                "これまでの会話履歴を分析して、間違いを日本語で優しく教えてください。",
-                str(st.session_state.messages)
-            ])
-            st.success("✨ 先生からのアドバイス")
-            st.write(advice_res.text)
+if st.button("アドバイスをもらう"):
+    if st.session_state.messages:
+        advice = model.generate_content([
+            "これまでの会話を振り返り、改善点を日本語で優しく教えてください。",
+            str(st.session_state.messages)
+        ])
+        st.success("✨ 先生のアドバイス")
+        st.write(advice.text)
