@@ -14,22 +14,26 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 【変更点】より安定した音声入力パーツに変更
+# 音声入力
 audio_value = st.audio_input("ここを押して話してね")
-
-# もし上がダメな場合、以下の「ファイルアップロード」を予備として出す
-if audio_value is None:
-    st.info("※マイクが反応しない場合は、スマホのボイスメモ録音ファイルを下にドラッグしてもOKです。")
-    audio_value = st.file_uploader("音声ファイルをアップロード", type=['wav', 'mp3', 'm4a'])
 
 if audio_value:
     with st.spinner('先生が考えています...'):
+        # 【重要】AIが読み取れる形式（Blob）にデータを包み直す
+        audio_data = {
+            "mime_type": "audio/wav",
+            "data": audio_value.read()
+        }
+        
+        # 先生への指示と音声データを一緒に送る
         response = model.generate_content([
-            "あなたはフレンドリーな英会話講師です。今はロールプレイ中で、アドバイスはせず会話を楽しんでください。返信は短く。",
+            "あなたはフレンドリーな英会話講師です。今はロールプレイ中なので、アドバイスはせず会話を楽しんでください。返信は英語で短く返してください。",
             *st.session_state.messages,
-            audio_value
+            audio_data
         ])
-        st.session_state.messages.append(f"User (Audio attached)")
+        
+        # 履歴の更新（テキストのみ保存）
+        st.session_state.messages.append(f"User: (Sent an audio message)")
         st.session_state.messages.append(f"Teacher: {response.text}")
     
     st.subheader("Teacher:")
@@ -37,9 +41,15 @@ if audio_value:
 
 st.divider()
 
+# アドバイスボタン
 if st.button("今日の英会話のアドバイスをもらう"):
     if len(st.session_state.messages) > 0:
         with st.spinner('アドバイスをまとめています...'):
-            advice_res = model.generate_content(["これまでの会話を日本語で優しく添削して", str(st.session_state.messages)])
+            advice_res = model.generate_content([
+                "これまでの会話の履歴を見て、文法ミスやより自然な言い回しを日本語で優しく教えてください。",
+                str(st.session_state.messages)
+            ])
             st.success("✨ 先生からのアドバイス")
             st.write(advice_res.text)
+    else:
+        st.warning("まずは会話を始めてみてね！")
