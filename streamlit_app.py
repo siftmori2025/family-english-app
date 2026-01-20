@@ -1,9 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
-# ここを修正：明示的に types をインポートします
-from google.generativeai import types
 
-st.title("Family English Tutor (Gemini 3) 🎤")
+st.title("Family English Tutor 🎤")
 
 # APIキー設定
 if "GOOGLE_API_KEY" in st.secrets:
@@ -11,8 +9,9 @@ if "GOOGLE_API_KEY" in st.secrets:
 else:
     st.error("APIキーが設定されていません。")
 
-# モデルの設定
-model = genai.GenerativeModel('gemini-3-flash')
+# モデルの設定（最新の gemini-1.5-flash または gemini-2.0-flash などが安定しています）
+# Gemini 3 がエラーになる場合はここを 'gemini-1.5-flash' に戻してみてください
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -21,13 +20,13 @@ if "messages" not in st.session_state:
 audio_value = st.audio_input("ここを押して話してね")
 
 if audio_value:
-    with st.spinner('Gemini 3 が聞き取っています...'):
+    with st.spinner('先生が聞いています...'):
         try:
-            # 【修正点】確実に Blob を作成するための記述
-            audio_data = genai.types.Blob(
-                mime_type='audio/wav',
-                data=audio_value.read()
-            )
+            # 【解決策】最もシンプルなデータ形式でAIに渡します
+            audio_data = {
+                "mime_type": "audio/wav",
+                "data": audio_value.getvalue() # read()ではなくgetvalue()を使うのがStreamlitのコツです
+            }
             
             prompt = "You are a friendly English teacher. Reply in short English. If the user mentions a situation like 'hotel' or 'directions', play along."
             
