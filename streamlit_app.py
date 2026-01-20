@@ -1,7 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
+from google.generativeai import types # 追加
 
-st.title("Family English Tutor (Gemini 3 版) 🎤")
+st.title("Family English Tutor (Gemini 3) 🎤")
 
 # APIキー設定
 if "GOOGLE_API_KEY" in st.secrets:
@@ -9,48 +10,49 @@ if "GOOGLE_API_KEY" in st.secrets:
 else:
     st.error("APIキーが設定されていません。")
 
-# 【ここを最新に！】
-# Google AI Studioの最新環境に合わせてモデル名を指定します
+# モデルの設定
 model = genai.GenerativeModel('gemini-3-flash')
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# 音声入力パーツ
 audio_value = st.audio_input("ここを押して話してね")
 
 if audio_value:
-    with st.spinner('Gemini 3 が考えています...'):
+    with st.spinner('Gemini 3 が聞き取っています...'):
         try:
-            audio_data = {
-                "mime_type": "audio/wav",
-                "data": audio_value.read()
-            }
+            # 【エラー解決の鍵】Blobオブジェクトを正しく作成する
+            audio_data = types.Blob(
+                mime_type='audio/wav',
+                data=audio_value.read()
+            )
             
-            # Gemini 3 はより複雑な指示も理解できます
-            response = model.generate_content([
-                "You are an expert English coach using the Gemini 3 model. Help the user practice English for specific situations (hotel, asking directions). Be natural and encouraging. Keep it short.",
-                *st.session_state.messages,
-                audio_data
-            ])
+            # 命令（プロンプト）の作成
+            prompt = "You are a friendly English teacher. Reply in short English. If the user mentions a situation like 'hotel' or 'directions', play along."
             
-            st.session_state.messages.append(f"User: (Voice)")
+            # AIに送信
+            response = model.generate_content([prompt, audio_data])
+            
+            # 履歴の保存
+            st.session_state.messages.append(f"User: (Voice message)")
             st.session_state.messages.append(f"Teacher: {response.text}")
             
-            st.subheader("Teacher (Gemini 3):")
+            st.subheader("Teacher:")
             st.write(response.text)
             
         except Exception as e:
-            st.error(f"モデル呼び出しエラー: {e}")
-            st.info("もし 'model not found' と出る場合は 'gemini-1.5-flash' に戻すと安定します。")
+            st.error(f"エラーが発生しました: {e}")
+            st.info("ブラウザの『鍵マーク』からマイク許可を再確認してください。")
 
 st.divider()
 
 if st.button("今日の英会話のアドバイスをもらう"):
     if len(st.session_state.messages) > 0:
-        with st.spinner('Gemini 3 が分析中...'):
+        with st.spinner('アドバイスを作成中...'):
             advice_res = model.generate_content([
-                "Gemini 3の高度な分析能力を使って、これまでの会話を日本語で優しく添削してください。",
+                "これまでの会話を振り返り、文法ミスやより良い表現を日本語で優しく解説してください。",
                 str(st.session_state.messages)
             ])
-            st.success("✨ Gemini 3 からのアドバイス")
+            st.success("✨ 先生からのアドバイス")
             st.write(advice_res.text)
