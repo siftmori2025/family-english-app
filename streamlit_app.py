@@ -2,64 +2,77 @@ import streamlit as st
 import google.generativeai as genai
 import streamlit.components.v1 as components
 
-st.title("Family English Tutor 🎤")
+# ページ設定
+st.set_page_config(page_title="Family English Tutor", page_icon="🎓")
+st.title("Family English Tutor 🎤✨")
 
 # --- 1. APIキーの設定 ---
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
 else:
-    st.error("APIキーをSecretsに設定してください。")
+    st.error("APIキーを設定してください。")
 
-# --- 2. モデルの自動選択（404対策の決定版） ---
-@st.cache_resource
-def get_model():
-    # 2026年現在の最新候補を優先順位順に並べています
-    candidates = [
-        'gemini-2.0-flash', 
-        'gemini-1.5-flash-8b', 
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-flash'
-    ]
-    # あなたのキーで使えるモデルを一覧取得
-    available = [m.name.replace('models/', '') for m in genai.list_models()]
+# 最も安定しているモデルを指定
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+# 履歴の保持
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# --- 2. 使い方ガイド ---
+st.info("💡 スマホのキーボードにある「マイクのマーク」を押して英語で話しかけてね！")
+
+# --- 3. 入力部分（テキストチャット形式） ---
+# これがスマホの音声入力と相性抜群です
+user_input = st.chat_input("Type or use voice dictation here...")
+
+if user_input:
+    # ユーザーの入力を表示
+    st.session_state.messages.append({"role": "user", "content": user_input})
     
-    for c in candidates:
-        if c in available:
-            return genai.GenerativeModel(f'models/{c}')
-    # どれも見つからない場合は、リストの最初にあるFlash系を探す
-    for a in available:
-        if 'flash' in a:
-            return genai.GenerativeModel(f'models/{a}')
-    return None
-
-model = get_model()
-
-if model is None:
-    st.error("利用可能なFlashモデルが見つかりません。")
-else:
-    # 実際に繋がったモデルを表示（安心のため）
-    st.caption(f"Connected to: {model.model_name}")
-
-# --- 3. メイン動作 ---
-audio_value = st.audio_input("ここを押して話してね")
-
-if audio_value:
-    with st.spinner('Thinking...'):
+    with st.spinner('先生が考えています...'):
         try:
-            # 音声送信
-            res = model.generate_content([
-                "You are a friendly English teacher. Reply in 1 short sentence.",
-                {"mime_type": "audio/wav", "data": audio_value.getvalue()}
+            # AIへの送信（テキストのみなので高速・低エラー率）
+            response = model.generate_content([
+                "You are a friendly, encouraging English teacher. Reply in 1-2 short sentences. Keep it simple for a family.",
+                user_input
             ])
             
-            st.write(f"Teacher: {res.text}")
-            
-            # 音声再生
-            clean_text = res.text.replace('"', '\\"')
-            components.html(f"<script>var m=new SpeechSynthesisUtterance('{clean_text}');m.lang='en-US';window.speechSynthesis.speak(m);</script>", height=0)
+            ai_reply = response.text
+            st.session_state.messages.append({"role": "assistant", "content": ai_reply})
             
         except Exception as e:
-            if "429" in str(e):
-                st.warning("少し混み合っています。10秒待ってからもう一度話してね。")
-            else:
-                st.error(f"Error: {e}")
+            st.error(f"エラーが発生しました: {e}")
+            ai_reply = None
+
+# --- 4. 会話の表示と音声再生 ---
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        st.chat_message("user").write(msg["content"])
+    else:
+        st.chat_message("assistant").write(msg["content"])
+        
+        # 最新のAIの返事だけを自動で喋らせる
+        if msg == st.session_state.messages[-1]:
+            clean_text = msg["content"].replace("\n", " ").replace('"', '\\"')
+            js_code = f"""
+            <script>
+                var msg = new SpeechSynthesisUtterance("{clean_text}");
+                msg.lang = 'en-US';
+                msg.rate = 0.9;
+                window.speechSynthesis.speak(msg);
+            </script>
+            """
+            components.html(js_code, height=0)
+
+# --- 5. アドバイス機能（任意） ---
+st.divider()
+if st.button("今日のアドバイスをもらう"):
+    if st.session_state.messages:
+        with st.spinner('分析中...'):
+            advice = model.generate_content([
+                "以下の会話履歴を見て、文法のアドバイスを日本語で優しく教えてください。",
+                str(st.session_state.messages)
+            ])
+            st.success("✨ 先生からのアドバイス")
+            st.write(advice.text)
